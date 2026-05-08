@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "Member": {
+      "title": "Member",
+      "description": "A student group member participating in speech sessions.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "group": { "type": "string", "enum": ["A", "B", "C"] },
+        "totalScore": { "type": "number" },
+        "totalFinePaid": { "type": "number" },
+        "totalFineDue": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "group", "totalScore", "totalFinePaid", "totalFineDue"]
+    },
+    "AttendanceRecord": {
+      "title": "Attendance Record",
+      "description": "A record of a member's attendance and scoring for a specific session.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "memberId": { "type": "string" },
+        "group": { "type": "string", "enum": ["A", "B", "C"] },
+        "role": { "type": "string", "enum": ["speaker", "listener", "none"] },
+        "status": { "type": "string", "enum": ["present", "absent"] },
+        "marks": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["date", "memberId", "group", "role", "status", "marks"]
+    },
+    "FineRecord": {
+      "title": "Fine Record",
+      "description": "A record of a fine imposed on a member.",
+      "type": "object",
+      "properties": {
+        "memberId": { "type": "string" },
+        "memberName": { "type": "string" },
+        "amount": { "type": "number" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["due", "paid"] },
+        "date": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["memberId", "amount", "status", "date"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Users with administrative privileges.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" }
+      },
+      "required": ["email"]
+    }
+  },
+  "firestore": {
+    "members": {
+      "schema": "Member",
+      "description": "Collection of all members."
+    },
+    "attendance": {
+      "schema": "AttendanceRecord",
+      "description": "Weekly attendance and marks logs."
+    },
+    "fines": {
+      "schema": "FineRecord",
+      "description": "Historical records of fines and payments."
+    },
+    "admins": {
+      "schema": "Admin",
+      "description": "Access control list for administrators."
+    }
+  }
+}

@@ -1,0 +1,128 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // -------------------------------------------------------------------------
+    // 1. GLOBALS & HELPERS
+    // -------------------------------------------------------------------------
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      // Bootstrapped Admin: mdimranhasanfuyad@gmail.com
+      return isEmailVerified() && (
+        request.auth.token.email == "mdimranhasanfuyad@gmail.com" ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. MEMBER RULES
+    // -------------------------------------------------------------------------
+    
+    function isValidMember(data) {
+      return data.keys().hasAll(['name', 'group', 'totalScore', 'totalFinePaid', 'totalFineDue', 'createdAt', 'updatedAt'])
+             && data.keys().size() == 7
+             && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+             && data.group in ['A', 'B', 'C']
+             && data.totalScore is number
+             && data.totalFinePaid is number
+             && data.totalFineDue is number
+             && data.createdAt is timestamp
+             && data.updatedAt is timestamp;
+    }
+
+    match /members/{memberId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() && isValidId(memberId) && isValidMember(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidMember(incoming()) 
+                     && incoming().createdAt == existing().createdAt
+                     && incoming().updatedAt == request.time;
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. ATTENDANCE RULES
+    // -------------------------------------------------------------------------
+    
+    function isValidAttendance(data) {
+      return data.keys().hasAll(['date', 'memberId', 'group', 'role', 'status', 'marks', 'createdAt', 'updatedAt'])
+             && data.keys().size() == 8
+             && data.date is string && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+             && data.memberId is string && isValidId(data.memberId)
+             && exists(/databases/$(database)/documents/members/$(data.memberId))
+             && data.group in ['A', 'B', 'C']
+             && data.role in ['speaker', 'listener', 'none']
+             && data.status in ['present', 'absent']
+             && data.marks is number && data.marks >= 0 && data.marks <= 10
+             && data.createdAt is timestamp
+             && data.updatedAt is timestamp;
+    }
+
+    match /attendance/{attendanceId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() && isValidId(attendanceId) && isValidAttendance(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidAttendance(incoming())
+                     && incoming().memberId == existing().memberId
+                     && incoming().createdAt == existing().createdAt
+                     && incoming().updatedAt == request.time;
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. FINE RULES
+    // -------------------------------------------------------------------------
+    
+    function isValidFine(data) {
+      return data.keys().hasAll(['memberId', 'memberName', 'amount', 'reason', 'status', 'date', 'createdAt'])
+             && data.keys().size() == 7
+             && data.memberId is string && isValidId(data.memberId)
+             && data.memberName is string
+             && data.amount is number
+             && data.reason is string
+             && data.status in ['due', 'paid']
+             && data.date is timestamp
+             && data.createdAt is timestamp;
+    }
+
+    match /fines/{fineId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() && isValidId(fineId) && isValidFine(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidFine(incoming())
+                     && incoming().memberId == existing().memberId
+                     && incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. ADMINS RULES
+    // -------------------------------------------------------------------------
+    
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin(); // Only existing admins can add/remove others
+    }
+  }
+}
